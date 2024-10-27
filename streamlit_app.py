@@ -33,7 +33,7 @@ st.write(
 ### experminenting with Gemini
 
 ggi.configure(api_key = st.secrets["GEMINI_KEY"])
-model = ggi.GenerativeModel("gemini-flash") 
+model = ggi.GenerativeModel("gemini-1.5-flash-8b") 
 chat = model.start_chat()
 
 def LLM_Response(question):
