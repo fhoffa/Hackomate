@@ -21,7 +21,7 @@ st.button('add participant')
 st.write(
     "Step 2: Once a participan is logged in, they can suggest projects. The LLM will suggest other ideas, and suggest what tools from the sponsors can be used."
 )
-st.input('suggest a project')
+st.text_input('suggest a project')
 
 st.write(
     "Step 3: People can ask to participate in projects, and the project owner can choose who they want in their team based on their skills."
