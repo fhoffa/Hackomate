@@ -32,6 +32,7 @@ st.write(
 
 ### experminenting with Gemini
 
+ggi.configure(api_key = st.secrets["GEMINI_KEY"])
 model = ggi.GenerativeModel("gemini-flash") 
 chat = model.start_chat()
 
@@ -47,5 +48,7 @@ if btn and user_quest:
     st.subheader("Response : ")
     for word in result:
         st.text(word.text)
+
+
 
 
