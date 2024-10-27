@@ -164,7 +164,7 @@ if btn and user_quest:
 ### experimenting with postgres
 
 conn = st.connection("neon", type="sql")
-df = conn.query('SELECT * FROM home;', ttl="10m")
+df = conn.query('SELECT * FROM participants;', ttl="1m")
 for row in df.itertuples():
     st.write(f"{row.name} has a :{row.pet}:")
 
