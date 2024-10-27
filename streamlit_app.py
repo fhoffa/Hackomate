@@ -1,4 +1,5 @@
 import streamlit as st
+import google.generativeai as ggi
 
 st.title("Hackomate")
 
@@ -26,5 +27,26 @@ st.text_input('suggest a project')
 st.write(
     "Step 3: People can ask to participate in projects, and the project owner can choose who they want in their team based on their skills."
 )
+
+
+
+### experminenting with Gemini
+
+st.secrets["GEMINI_KEY"]
+model = ggi.GenerativeModel("gemini-flash") 
+chat = model.start_chat()
+
+def LLM_Response(question):
+    response = chat.send_message(question,stream=True)
+    return response
+
+st.title("Chat Application using Gemini Pro")
+user_quest = st.text_input("Ask a question:")
+btn = st.button("Ask")
+if btn and user_quest:
+    result = LLM_Response(user_quest)
+    st.subheader("Response : ")
+    for word in result:
+        st.text(word.text)
 
 
