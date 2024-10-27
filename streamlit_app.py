@@ -32,7 +32,6 @@ st.write(
 
 ### experminenting with Gemini
 
-st.secrets["GEMINI_KEY"]
 model = ggi.GenerativeModel("gemini-flash") 
 chat = model.start_chat()
 
