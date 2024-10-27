@@ -166,7 +166,7 @@ if btn and user_quest:
 conn = st.connection("neon", type="sql")
 df = conn.query('SELECT * FROM participants;', ttl="1m")
 for row in df.itertuples():
-    st.write(f"{row.name} has a :{row.pet}:")
+    st.write(f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
 
 
 
