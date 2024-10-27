@@ -160,3 +160,13 @@ if btn and user_quest:
     for word in result:
         st.text(word.text)
 
+
+### experimenting with postgres
+
+conn = st.connection("neon", type="sql")
+df = conn.query('SELECT * FROM home;', ttl="10m")
+for row in df.itertuples():
+    st.write(f"{row.name} has a :{row.pet}:")
+
+
+
