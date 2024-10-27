@@ -15,7 +15,7 @@ db_participants = [
 ]    
 
 
-st.write(db_participants)
+st.dataframe(db_participants)
 
 
 st.write(
