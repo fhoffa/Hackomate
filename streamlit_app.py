@@ -4,9 +4,9 @@ import google.generativeai as ggi
 
 
 st.image(
-        "https://i.imgur.com/8Db5CpT.png",
-        width=200, # Manually Adjust the width of the image as per requirement
-    )
+    "https://i.imgur.com/8Db5CpT.png",
+    width=200,  # Manually Adjust the width of the image as per requirement
+)
 
 # Initialize session state variables
 if 'show_sponsor_form' not in st.session_state:
@@ -129,9 +129,6 @@ db_projects = [
         ['App Development', 'Community Building', 'Social Media Marketing']
     ],
 ]
-
-st.header("Project Ideas")
-project_df = pd.DataFrame(db_projects[1:], columns=db_projects[0])
 
 st.header("Project Ideas")
 project_df = pd.DataFrame(db_projects[1:], columns=db_projects[0])
@@ -312,11 +309,10 @@ if btn and user_quest:
         st.text(word.text)
 
 
-### experimenting with postgres
+# experimenting with postgres
 
 conn = st.connection("neon", type="sql")
 df = conn.query('SELECT * FROM participants;', ttl="1m")
 for row in df.itertuples():
-    st.write(f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
-
-
+    st.write(
+        f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
