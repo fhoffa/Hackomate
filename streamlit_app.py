@@ -1,4 +1,5 @@
 import streamlit as st
+from sqlalchemy import text
 
 conn = st.connection("neon", type="sql")
 
@@ -51,14 +52,27 @@ if st.session_state.show_sponsor_form:
         features = st.text_area("Features")
         submitted = st.form_submit_button("Submit")
         if submitted:
-            # Add to database
-            conn.execute(f"""
-                INSERT INTO sponsors (name, url, features) 
-                VALUES ('{sponsor_name}', '{features}');
-            """)
-            st.success("Sponsor added successfully!")
-            st.session_state.show_sponsor_form = False
-            st.rerun()
+            try:
+                with conn.session as s:
+                    # Create sequence and insert without assuming column name
+                    s.execute(
+                        text("""
+                            INSERT INTO sponsors (name, features) 
+                            VALUES (:name, :features);
+                        """),
+                        params={
+                            'name': sponsor_name,
+                            'features': features
+                        }
+                    )
+                    s.commit()
+                st.success("Sponsor added successfully!")
+                st.session_state.show_sponsor_form = False
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error adding sponsor: {str(e)}")
+                s.rollback()
 
 
 st.header("Participants")
@@ -86,55 +100,36 @@ if st.session_state.show_participant_form:
         interested_in = st.text_area("Interested in")
         submitted = st.form_submit_button("Submit")
         if submitted:
-            # Add to database
-            conn.execute(f"""
-                INSERT INTO participants (name, url, skills, interested_in) 
-                VALUES ('{participant_name}', '{linkedin_url}', '{skills}', '{interested_in}');
-            """)
-            st.success("Participant added successfully!")
-            st.session_state.show_participant_form = False
-            st.rerun()
+            try:
+                with conn.session as s:
+                    # Ensure sequence exists and is synchronized
+                    s.execute(text("""
+                        CREATE SEQUENCE IF NOT EXISTS participants_id_seq;
+                        SELECT setval('participants_id_seq', COALESCE((SELECT MAX(prt_id) FROM participants), 0));
+                    """))
 
+                    s.execute(
+                        text("""
+                            INSERT INTO participants (prt_id, name, url, skills, interested_in) 
+                            VALUES (nextval('participants_id_seq'), :name, :url, :skills, :interested_in);
+                        """),
+                        params={
+                            'name': participant_name,
+                            'url': linkedin_url,
+                            'skills': skills,
+                            'interested_in': interested_in
+                        }
+                    )
+                    s.commit()
+                st.success("Participant added successfully!")
+                st.session_state.show_participant_form = False
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error adding participant: {str(e)}")
+                s.rollback()
 
 # Projects Data
-db_projects = [
-    ['Project Title', 'Idea', 'Leader', 'Members', 'Skills'],
-    [
-        'Smart Health Tracker',
-        'An AI-powered wearable device that monitors health metrics in real-time and provides personalized health insights.',
-        'Alice Johnson',
-        ['Alice Johnson', 'Michael Lee', 'Sarah Patel'],
-        ['AI Development', 'Wearable Technology', 'Health Data Analysis']
-    ],
-    [
-        'Eco-Friendly Packaging',
-        'A sustainable packaging solution that uses biodegradable materials and minimizes environmental impact.',
-        'David Kim',
-        ['David Kim', 'Emma Chen', 'Lucas Martinez'],
-        ['Product Design', 'Sustainability Engineering', 'Material Science']
-    ],
-    [
-        'Virtual Learning Assistant',
-        'An AI-driven platform that personalizes online learning experiences based on individual student needs and progress.',
-        'Nina Garcia',
-        ['Nina Garcia', 'James Smith', 'Olivia Brown'],
-        ['Machine Learning', 'Education Technology', 'User Experience Design']
-    ],
-    [
-        'Smart Home Energy Management',
-        'A system that optimizes energy usage in homes by learning user patterns and suggesting efficient energy-saving practices.',
-        'John Doe',
-        ['John Doe', 'Rachel Green', 'Ethan White'],
-        ['IoT Development', 'Energy Management', 'Data Analytics']
-    ],
-    [
-        'Community Engagement App',
-        'A mobile app that connects local communities, facilitating event organization and communication among residents.',
-        'Sophia Turner',
-        ['Sophia Turner', 'Daniel Harris', 'Mia Wilson'],
-        ['App Development', 'Community Building', 'Social Media Marketing']
-    ],
-]
 
 st.header("Project Ideas")
 
@@ -169,8 +164,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Helper function for database writes
-
 
 def execute_query(query):
     conn.query(query, ttl=0)
@@ -179,16 +172,16 @@ def execute_query(query):
 
 # Get projects with team members using JOIN
 project_df = conn.query('''
-    SELECT 
+    SELECT
         i.idea_id,
         i.title,
         i.idea,
         i.skills_needed,
         STRING_AGG(
-            CASE 
-                WHEN t.approved = true THEN p.name 
-                ELSE NULL 
-            END, 
+            CASE
+                WHEN t.approved = true THEN p.name
+                ELSE NULL
+            END,
             ', '
         ) as team_members,
         COUNT(CASE WHEN t.approved IS NULL THEN 1 END) as pending_requests
@@ -213,11 +206,13 @@ for index, row in project_df.iterrows():
                 <div class="project-detail"><strong>Idea:</strong> {row['idea']}</div>
                 <div class="project-detail"><strong>Skills needed:</strong></div>
                 <div>
-                    {''.join([f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
+                    {''.join(
+                        [f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
                 </div>
                 <div class="project-detail">
                     <strong>Current Team Members:</strong><br/>
-                    {', '.join(team_members) if team_members else "No team members yet"}
+                    {', '.join(team_members)
+                               if team_members else "No team members yet"}
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -270,7 +265,7 @@ if st.session_state.show_requests_modal:
 
     # Get pending requests
     pending_requests = conn.query(f'''
-        SELECT 
+        SELECT
             p.name,
             p.skills,
             t.team_id
@@ -291,8 +286,8 @@ if st.session_state.show_requests_modal:
                 if st.button("Accept", key=f"accept_{idx}"):
                     try:
                         execute_query(f"""
-                            UPDATE team 
-                            SET approved = true 
+                            UPDATE team
+                            SET approved = true
                             WHERE team_id = {request['team_id']};
                         """)
                         st.success(f"Accepted {request['name']}")
@@ -303,7 +298,7 @@ if st.session_state.show_requests_modal:
                 if st.button("Reject", key=f"reject_{idx}"):
                     try:
                         execute_query(f"""
-                            DELETE FROM team 
+                            DELETE FROM team
                             WHERE team_id = {request['team_id']};
                         """)
                         st.error(f"Rejected {request['name']}")
@@ -325,16 +320,39 @@ if st.session_state.show_project_form:
     with st.form("project_form"):
         project_title = st.text_input("Project Title")
         project_idea = st.text_area("Project Idea")
-        project_skills = st.text_input("Required Skills (comma-separated)")
+        required_skills = st.text_input("Required Skills (comma-separated)")
         submitted = st.form_submit_button("Submit")
+
         if submitted:
             try:
-                execute_query(f"""
-                    INSERT INTO ideas (title, idea, skills_needed) 
-                    VALUES ('{project_title}', '{project_idea}', '{project_skills}');
-                """)
+                with conn.session as s:
+                    # First ensure we have a sequence
+                    s.execute(text("""
+                        CREATE SEQUENCE IF NOT EXISTS ideas_id_seq;
+                    """))
+
+                    # Reset the sequence to start after the highest existing id
+                    s.execute(text("""
+                        SELECT setval('ideas_id_seq', COALESCE((SELECT MAX(idea_id) FROM ideas), 0));
+                    """))
+
+                    # Now insert the new record
+                    s.execute(
+                        text("""
+                            INSERT INTO ideas (idea_id, title, idea, skills_needed) 
+                            VALUES (nextval('ideas_id_seq'), :title, :idea, :skills_needed);
+                        """),
+                        params={
+                            'title': project_title,
+                            'idea': project_idea,
+                            'skills_needed': required_skills
+                        }
+                    )
+                    s.commit()
                 st.success("Project added successfully!")
                 st.session_state.show_project_form = False
+                st.cache_data.clear()
                 st.rerun()
             except Exception as e:
                 st.error(f"Error adding project: {str(e)}")
+                s.rollback()
