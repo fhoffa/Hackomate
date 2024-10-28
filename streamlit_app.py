@@ -37,21 +37,31 @@ if 'current_user' not in st.session_state:
 st.title("Hackomate")
 
 # Sponsors Data
-db_sponsors = [
-    ['Sponsor Name', 'Website URL', 'Features'],
-    ['Stori', 'https://www.stori.com', 'Stori leverages AI to provide personalized financial solutions, empowering users to take control of their finances with tailored insights and tools.'],
-    ['Neon', 'https://neon.tech', 'Neon is a cutting-edge AI platform that enhances productivity by automating workflows and enabling intelligent collaboration across teams.'],
-    ['Defi', 'https://defi.com', 'Defi utilizes AI to revolutionize decentralized finance, offering secure and innovative solutions for users to manage their digital assets effectively.'],
-    ['Edge', 'https://edge.ai', 'Edge harnesses AI technology to deliver real-time insights and analytics, optimizing decision-making for businesses in various sectors.'],
-    ['Weaviate', 'https://weaviate.io', 'Weaviate is an open-source vector search engine that utilizes AI to enable efficient and intelligent data retrieval, facilitating seamless information access.'],
-    ['Toolhouse', 'https://toolhouse.ai',
-        'Toolhouse combines AI-driven tools with a collaborative environment to streamline project management and enhance team productivity.'],
-    ['Restack', 'https://restack.io', 'Restack employs AI to simplify and optimize cloud infrastructure management, ensuring efficient resource allocation and scalability for enterprises.'],
-]
+# db_sponsors = [
+#     ['Sponsor Name', 'Website URL', 'Features'],
+#     ['Stori', 'https://www.stori.com', 'Stori leverages AI to provide personalized financial solutions, empowering users to take control of their finances with tailored insights and tools.'],
+#     ['Neon', 'https://neon.tech', 'Neon is a cutting-edge AI platform that enhances productivity by automating workflows and enabling intelligent collaboration across teams.'],
+#     ['Defi', 'https://defi.com', 'Defi utilizes AI to revolutionize decentralized finance, offering secure and innovative solutions for users to manage their digital assets effectively.'],
+#     ['Edge', 'https://edge.ai', 'Edge harnesses AI technology to deliver real-time insights and analytics, optimizing decision-making for businesses in various sectors.'],
+#     ['Weaviate', 'https://weaviate.io', 'Weaviate is an open-source vector search engine that utilizes AI to enable efficient and intelligent data retrieval, facilitating seamless information access.'],
+#     ['Toolhouse', 'https://toolhouse.ai',
+#         'Toolhouse combines AI-driven tools with a collaborative environment to streamline project management and enhance team productivity.'],
+#     ['Restack', 'https://restack.io', 'Restack employs AI to simplify and optimize cloud infrastructure management, ensuring efficient resource allocation and scalability for enterprises.'],
+# ]
 
 st.header("Sponsors")
-project_df = pd.DataFrame(db_sponsors[1:], columns=db_sponsors[0])
-st.dataframe(project_df)
+
+# Get sponsors data from database
+sponsors_df = conn.query('SELECT name,features FROM sponsors;', ttl="1m")
+
+# Rename columns for display
+sponsors_df = sponsors_df.rename(columns={
+    'name': 'Sponsor Name',
+    # 'url': 'Website URL',
+    'features': 'Features'
+})
+
+st.dataframe(sponsors_df)
 
 if st.button('Add Sponsor'):
     st.session_state.show_sponsor_form = not st.session_state.show_sponsor_form
@@ -59,13 +69,35 @@ if st.button('Add Sponsor'):
 if st.session_state.show_sponsor_form:
     with st.form("sponsor_form"):
         sponsor_name = st.text_input("Sponsor Name")
-        website_url = st.text_input("Website URL")
+        # website_url = st.text_input("Website URL")
         features = st.text_area("Features")
         submitted = st.form_submit_button("Submit")
         if submitted:
-            # Add logic to save sponsor data
+            # Add to database
+            conn.execute(f"""
+                INSERT INTO sponsors (name, url, features) 
+                VALUES ('{sponsor_name}', '{features}');
+            """)
             st.success("Sponsor added successfully!")
             st.session_state.show_sponsor_form = False
+            st.rerun()
+
+# project_df = pd.DataFrame(db_sponsors[1:], columns=db_sponsors[0])
+# st.dataframe(project_df)
+
+# if st.button('Add Sponsor'):
+#     st.session_state.show_sponsor_form = not st.session_state.show_sponsor_form
+
+# if st.session_state.show_sponsor_form:
+#     with st.form("sponsor_form"):
+#         sponsor_name = st.text_input("Sponsor Name")
+#         website_url = st.text_input("Website URL")
+#         features = st.text_area("Features")
+#         submitted = st.form_submit_button("Submit")
+#         if submitted:
+#             # Add logic to save sponsor data
+#             st.success("Sponsor added successfully!")
+#             st.session_state.show_sponsor_form = False
 
 
 # Participants Data
