@@ -2,6 +2,12 @@ import pandas as pd
 import streamlit as st
 import google.generativeai as ggi
 
+
+st.image(
+        "https://i.imgur.com/8Db5CpT.png",
+        width=200, # Manually Adjust the width of the image as per requirement
+    )
+
 # Initialize session state variables
 if 'show_sponsor_form' not in st.session_state:
     st.session_state.show_sponsor_form = False
@@ -304,3 +310,13 @@ if btn and user_quest:
     st.subheader("Response : ")
     for word in result:
         st.text(word.text)
+
+
+### experimenting with postgres
+
+conn = st.connection("neon", type="sql")
+df = conn.query('SELECT * FROM participants;', ttl="1m")
+for row in df.itertuples():
+    st.write(f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
+
+
