@@ -3,6 +3,32 @@ from sqlalchemy import text
 
 conn = st.connection("neon", type="sql")
 
+
+def setup_database():
+    try:
+        with conn.session as s:
+            # Check if column exists first
+            result = s.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'ideas' 
+                AND column_name = 'team_leader_id';
+            """)).fetchone()
+
+            if not result:
+                s.execute(text("""
+                    ALTER TABLE ideas 
+                    ADD COLUMN team_leader_id INTEGER REFERENCES participants(prt_id);
+                """))
+                s.commit()
+                print("Added team_leader_id column successfully")
+    except Exception as e:
+        print(f"Error setting up database: {e}")
+
+
+# Call the function to set up the database
+setup_database()
+
 st.image(
     "https://i.imgur.com/8Db5CpT.png",
     width=200,  # Manually Adjust the width of the image as per requirement
@@ -239,6 +265,44 @@ for index, row in project_df.iterrows():
                 else:
                     if st.button("Join Team", key=f"join_team_{index}"):
                         try:
+                            with conn.session as s:
+                                # First check if the request already exists
+                                result = s.execute(
+                                    text("""
+                                        SELECT COUNT(*) as count
+                                        FROM team t
+                                        JOIN participants p ON t.prt_id = p.prt_id
+                                        JOIN ideas i ON t.idea_id = i.idea_id
+                                        WHERE i.title = :title
+                                        AND p.name = :user_name
+                                        AND t.approved IS NULL;
+                                    """),
+                                    params={
+                                        'title': row['title'], 'user_name': st.session_state.current_user}
+                                ).scalar()
+                                if result == 0:
+                                    # If no existing request, insert the new request
+                                    s.execute(
+                                        text("""
+                                            INSERT INTO team (idea_id, prt_id, approved)
+                                            SELECT i.idea_id, p.prt_id, NULL
+                                            FROM ideas i, participants p
+                                            WHERE i.title = :title
+                                            AND p.name = :user_name;
+                                        """),
+                                        params={
+                                            'title': row['title'], 'user_name': st.session_state.current_user}
+                                    )
+                                    s.commit()
+                                    st.success(
+                                        f"Sent join request for {row['title']}")
+                                    st.rerun()
+                                else:
+                                    st.warning(
+                                        "You have already requested to join this team")
+                        except Exception as e:
+                            st.error(f"Error sending request: {str(e)}")
+
                             execute_query(f'''
                                 INSERT INTO team (idea_id, prt_id, approved)
                                 SELECT i.idea_id, p.prt_id, NULL
