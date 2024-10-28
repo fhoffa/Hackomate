@@ -184,7 +184,7 @@ project_df = conn.query('''
             END,
             ', '
         ) as team_members,
-        COUNT(CASE WHEN t.approved IS NULL THEN 1 END) as pending_requests
+        COUNT(CASE WHEN t.approved IS NULL AND t.team_id IS NOT NULL THEN 1 END) as pending_requests
     FROM ideas i
     LEFT JOIN team t ON i.idea_id = t.idea_id
     LEFT JOIN participants p ON t.prt_id = p.prt_id
