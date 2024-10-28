@@ -3,10 +3,10 @@ import streamlit as st
 import google.generativeai as ggi
 
 conn = st.connection("neon", type="sql")
-df = conn.query('SELECT * FROM participants;', ttl="1m")
-for row in df.itertuples():
-    st.write(
-        f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
+# df = conn.query('SELECT * FROM participants;', ttl="1m")
+# for row in df.itertuples():
+#     st.write(
+#         f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
 
 
 st.image(
@@ -203,9 +203,19 @@ db_projects = [
 ]
 
 st.header("Project Ideas")
-project_df = pd.DataFrame(db_projects[1:], columns=db_projects[0])
+project_df = conn.query(
+    'SELECT title, idea,skills_needed FROM ideas;', ttl="1m")
+
+
+project_df = project_df.rename(columns={
+    'title': 'Title',
+    'idea': 'Idea',
+    'skills_needed': 'Required Skills'
+})
+
 
 # Display projects with cards and join request functionality
+# Display projects with cards
 for index, row in project_df.iterrows():
     with st.container():
         # Custom CSS with black text in tags
@@ -241,40 +251,40 @@ for index, row in project_df.iterrows():
         """, unsafe_allow_html=True)
 
         # Project Card
+        skills_list = row['Required Skills'].split(
+            ',') if isinstance(row['Required Skills'], str) else []
+
         st.markdown(f"""
             <div class="project-card">
-                <div class="project-title">{row['Project Title']}</div>
-                <div class="project-detail"><strong>Leader:</strong> {row['Leader']}</div>
+                <div class="project-title">{row['Title']}</div>
                 <div class="project-detail"><strong>Idea:</strong> {row['Idea']}</div>
                 <div class="project-detail"><strong>Skills needed:</strong></div>
                 <div>
-                    {''.join([f'<span class="skills-tag">{skill}</span>' for skill in row['Skills']])}
+                    {''.join([f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
         col1, col2 = st.columns([2, 1])
 
-        # Team members and pending requests
-        with col1:
-            st.write("**Current Team Members:**")
-            st.write(", ".join(row['Members']))
+        # Initialize join requests for this project if not exists
+        project_title = row['Title']
+        if project_title not in st.session_state.join_requests:
+            st.session_state.join_requests[project_title] = []
 
-            project_title = row['Project Title']
-            # Show pending requests count
-            if project_title in st.session_state.join_requests and st.session_state.join_requests[project_title]:
-                st.write(
-                    f"**Pending Requests:** {len(st.session_state.join_requests[project_title])}")
+        pending_count = len(st.session_state.join_requests[project_title])
 
         # Action buttons
         with col2:
-            project_title = row['Project Title']
-
-            # Initialize join requests for this project if not exists
-            if project_title not in st.session_state.join_requests:
-                st.session_state.join_requests[project_title] = []
-
-            pending_count = len(st.session_state.join_requests[project_title])
+            # Show join button if not a member
+            if st.session_state.current_user not in st.session_state.join_requests[project_title]:
+                if st.button("Join Team", key=f"join_team_{index}"):
+                    st.session_state.join_requests[project_title].append(
+                        st.session_state.current_user)
+                    st.success(f"Sent join request for {project_title}")
+                    st.rerun()
+            else:
+                st.warning("Request pending")
 
             # Show manage requests button if there are any requests
             if pending_count > 0:
@@ -282,52 +292,42 @@ for index, row in project_df.iterrows():
                     st.session_state.selected_project = project_title
                     st.session_state.show_requests_modal = True
 
-            # Show join button if not a member
-            if st.session_state.current_user not in row['Members']:
-                if st.session_state.current_user in st.session_state.join_requests[project_title]:
-                    st.warning("Request pending")
-                else:
-                    if st.button("Join Team", key=f"join_team_{index}"):
-                        st.session_state.join_requests[project_title].append(
-                            st.session_state.current_user)
-                        st.success(f"Sent join request for {project_title}")
-                        st.rerun()
 
 # Simplified Manage Requests Modal
-if st.session_state.show_requests_modal:
-    st.markdown("""
-        <style>
-        .request-list {
-            margin: 10px 0;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+# if st.session_state.show_requests_modal:
+#     st.markdown("""
+#         <style>
+#         .request-list {
+#             margin: 10px 0;
+#         }
+#         </style>
+#     """, unsafe_allow_html=True)
 
-    project = st.session_state.selected_project
-    st.subheader(f"Manage Requests - {project}")
+#     project = st.session_state.selected_project
+#     st.subheader(f"Manage Requests - {project}")
 
-    requests = st.session_state.join_requests[project]
-    if requests:
-        for idx, requester in enumerate(requests):
-            cols = st.columns([3, 1, 1])
-            with cols[0]:
-                st.write(f"**{requester}**")
-            with cols[1]:
-                if st.button("Accept", key=f"accept_{requester}_{idx}"):
-                    st.session_state.join_requests[project].remove(requester)
-                    st.success(f"Accepted {requester}")
-                    st.rerun()
-            with cols[2]:
-                if st.button("Reject", key=f"reject_{requester}_{idx}"):
-                    st.session_state.join_requests[project].remove(requester)
-                    st.error(f"Rejected {requester}")
-                    st.rerun()
-    else:
-        st.info("No pending requests")
+#     requests = st.session_state.join_requests[project]
+#     if requests:
+#         for idx, requester in enumerate(requests):
+#             cols = st.columns([3, 1, 1])
+#             with cols[0]:
+#                 st.write(f"**{requester}**")
+#             with cols[1]:
+#                 if st.button("Accept", key=f"accept_{requester}_{idx}"):
+#                     st.session_state.join_requests[project].remove(requester)
+#                     st.success(f"Accepted {requester}")
+#                     st.rerun()
+#             with cols[2]:
+#                 if st.button("Reject", key=f"reject_{requester}_{idx}"):
+#                     st.session_state.join_requests[project].remove(requester)
+#                     st.error(f"Rejected {requester}")
+#                     st.rerun()
+#     else:
+#         st.info("No pending requests")
 
-    if st.button("Close", key="close_modal"):
-        st.session_state.show_requests_modal = False
-        st.rerun()
+#     if st.button("Close", key="close_modal"):
+#         st.session_state.show_requests_modal = False
+#         st.rerun()
 
 if st.button('Add Project'):
     st.session_state.show_project_form = not st.session_state.show_project_form
