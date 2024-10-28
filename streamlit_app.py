@@ -1,6 +1,4 @@
-import pandas as pd
 import streamlit as st
-import google.generativeai as ggi
 
 conn = st.connection("neon", type="sql")
 # df = conn.query('SELECT * FROM participants;', ttl="1m")
@@ -36,25 +34,10 @@ if 'current_user' not in st.session_state:
 
 st.title("Hackomate")
 
-# Sponsors Data
-# db_sponsors = [
-#     ['Sponsor Name', 'Website URL', 'Features'],
-#     ['Stori', 'https://www.stori.com', 'Stori leverages AI to provide personalized financial solutions, empowering users to take control of their finances with tailored insights and tools.'],
-#     ['Neon', 'https://neon.tech', 'Neon is a cutting-edge AI platform that enhances productivity by automating workflows and enabling intelligent collaboration across teams.'],
-#     ['Defi', 'https://defi.com', 'Defi utilizes AI to revolutionize decentralized finance, offering secure and innovative solutions for users to manage their digital assets effectively.'],
-#     ['Edge', 'https://edge.ai', 'Edge harnesses AI technology to deliver real-time insights and analytics, optimizing decision-making for businesses in various sectors.'],
-#     ['Weaviate', 'https://weaviate.io', 'Weaviate is an open-source vector search engine that utilizes AI to enable efficient and intelligent data retrieval, facilitating seamless information access.'],
-#     ['Toolhouse', 'https://toolhouse.ai',
-#         'Toolhouse combines AI-driven tools with a collaborative environment to streamline project management and enhance team productivity.'],
-#     ['Restack', 'https://restack.io', 'Restack employs AI to simplify and optimize cloud infrastructure management, ensuring efficient resource allocation and scalability for enterprises.'],
-# ]
 
 st.header("Sponsors")
 
-# Get sponsors data from database
 sponsors_df = conn.query('SELECT name,features FROM sponsors;', ttl="1m")
-
-# Rename columns for display
 sponsors_df = sponsors_df.rename(columns={
     'name': 'Sponsor Name',
     # 'url': 'Website URL',
@@ -82,39 +65,12 @@ if st.session_state.show_sponsor_form:
             st.session_state.show_sponsor_form = False
             st.rerun()
 
-# project_df = pd.DataFrame(db_sponsors[1:], columns=db_sponsors[0])
-# st.dataframe(project_df)
-
-# if st.button('Add Sponsor'):
-#     st.session_state.show_sponsor_form = not st.session_state.show_sponsor_form
-
-# if st.session_state.show_sponsor_form:
-#     with st.form("sponsor_form"):
-#         sponsor_name = st.text_input("Sponsor Name")
-#         website_url = st.text_input("Website URL")
-#         features = st.text_area("Features")
-#         submitted = st.form_submit_button("Submit")
-#         if submitted:
-#             # Add logic to save sponsor data
-#             st.success("Sponsor added successfully!")
-#             st.session_state.show_sponsor_form = False
-
-
-# Participants Data
-# db_participants = [
-#     ['Participant Name', 'LinkedIn URL', 'Skills'],
-#     ['Felipe Hoffa', 'https://linkedin.com/in/hoffa', ['Data', 'Python']],
-#     ['Asako', 'https://www.linkedin.com/in/asako-hayase-924508ba/', ['Marketing', 'UX']],
-#     ['Aninda', 'https://www.linkedin.com/in/aninda-sengupta/', ['Java', 'Python']],
-#     ['Gulsher', 'https://www.linkedin.com/in/gulsher-kooner/', ['Data', 'Spark']],
-# ]
 
 st.header("Participants")
-# Get participants data from database
+
 participants_df = conn.query(
     'SELECT name, url, interested_in, skills FROM participants;', ttl="1m")
 
-# Rename columns to match the expected format
 participants_df = participants_df.rename(columns={
     'name': 'Name',
     'url': 'LinkedIn URL',
@@ -143,23 +99,6 @@ if st.session_state.show_participant_form:
             st.success("Participant added successfully!")
             st.session_state.show_participant_form = False
             st.rerun()
-
-# project_df = pd.DataFrame(db_participants[1:], columns=db_participants[0])
-# st.dataframe(project_df)
-
-# if st.button('Add Participant'):
-#     st.session_state.show_participant_form = not st.session_state.show_participant_form
-
-# if st.session_state.show_participant_form:
-#     with st.form("participant_form"):
-#         participant_name = st.text_input("Participant Name")
-#         linkedin_url = st.text_input("LinkedIn URL")
-#         skills = st.text_input("Skills (comma-separated)")
-#         submitted = st.form_submit_button("Submit")
-#         if submitted:
-#             # Add logic to save participant data
-#             st.success("Participant added successfully!")
-#             st.session_state.show_participant_form = False
 
 
 # Projects Data
@@ -203,131 +142,295 @@ db_projects = [
 ]
 
 st.header("Project Ideas")
-project_df = conn.query(
-    'SELECT title, idea,skills_needed FROM ideas;', ttl="1m")
+
+# Add CSS once at the top
+st.markdown("""
+    <style>
+    .project-card {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 10px 0;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .project-title {
+        color: #0569a0;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .project-detail {
+        color: #333;
+        margin: 0.5rem 0;
+    }
+    .skills-tag {
+        background-color: #f0f2f6;
+        color: black;
+        padding: 0.2rem 0.5rem;
+        border-radius: 15px;
+        margin-right: 0.5rem;
+        display: inline-block;
+        margin-bottom: 0.3rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Helper function for database writes
 
 
-project_df = project_df.rename(columns={
-    'title': 'Title',
-    'idea': 'Idea',
-    'skills_needed': 'Required Skills'
-})
+def execute_query(query):
+    conn.query(query, ttl=0)
+    conn.query("SELECT 1;", ttl=0)  # Force cache clearing
 
 
-# Display projects with cards and join request functionality
+# Get projects with team members using JOIN
+project_df = conn.query('''
+    SELECT 
+        i.idea_id,
+        i.title,
+        i.idea,
+        i.skills_needed,
+        STRING_AGG(
+            CASE 
+                WHEN t.approved = true THEN p.name 
+                ELSE NULL 
+            END, 
+            ', '
+        ) as team_members,
+        COUNT(CASE WHEN t.approved IS NULL THEN 1 END) as pending_requests
+    FROM ideas i
+    LEFT JOIN team t ON i.idea_id = t.idea_id
+    LEFT JOIN participants p ON t.prt_id = p.prt_id
+    GROUP BY i.idea_id, i.title, i.idea, i.skills_needed;
+''', ttl="1m")
+
 # Display projects with cards
 for index, row in project_df.iterrows():
     with st.container():
-        # Custom CSS with black text in tags
-        st.markdown("""
-            <style>
-            .project-card {
-                background-color: white;
-                padding: 1.5rem;
-                border-radius: 10px;
-                margin: 10px 0;
-                border: 1px solid #ddd;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .project-title {
-                color: #0569a0;
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-            }
-            .project-detail {
-                color: #333;
-                margin: 0.5rem 0;
-            }
-            .skills-tag {
-                background-color: #f0f2f6;
-                color: black;
-                padding: 0.2rem 0.5rem;
-                border-radius: 15px;
-                margin-right: 0.5rem;
-                display: inline-block;
-                margin-bottom: 0.3rem;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
         # Project Card
-        skills_list = row['Required Skills'].split(
-            ',') if isinstance(row['Required Skills'], str) else []
+        skills_list = row['skills_needed'].split(
+            ',') if isinstance(row['skills_needed'], str) else []
+        team_members = row['team_members'].split(
+            ', ') if row['team_members'] else []
 
         st.markdown(f"""
             <div class="project-card">
-                <div class="project-title">{row['Title']}</div>
-                <div class="project-detail"><strong>Idea:</strong> {row['Idea']}</div>
+                <div class="project-title">{row['title']}</div>
+                <div class="project-detail"><strong>Idea:</strong> {row['idea']}</div>
                 <div class="project-detail"><strong>Skills needed:</strong></div>
                 <div>
                     {''.join([f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
                 </div>
+                <div class="project-detail">
+                    <strong>Current Team Members:</strong><br/>
+                    {', '.join(team_members) if team_members else "No team members yet"}
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
-        col1, col2 = st.columns([2, 1])
+        # Action buttons column
+        col1, col2 = st.columns([3, 1])
 
-        # Initialize join requests for this project if not exists
-        project_title = row['Title']
-        if project_title not in st.session_state.join_requests:
-            st.session_state.join_requests[project_title] = []
-
-        pending_count = len(st.session_state.join_requests[project_title])
-
-        # Action buttons
         with col2:
-            # Show join button if not a member
-            if st.session_state.current_user not in st.session_state.join_requests[project_title]:
-                if st.button("Join Team", key=f"join_team_{index}"):
-                    st.session_state.join_requests[project_title].append(
-                        st.session_state.current_user)
-                    st.success(f"Sent join request for {project_title}")
-                    st.rerun()
-            else:
-                st.warning("Request pending")
+            # Show join button if not already a member
+            if st.session_state.current_user not in team_members:
+                # Check if already requested
+                already_requested = conn.query(f'''
+                    SELECT COUNT(*) as count
+                    FROM team t
+                    JOIN participants p ON t.prt_id = p.prt_id
+                    JOIN ideas i ON t.idea_id = i.idea_id
+                    WHERE i.title = '{row['title']}'
+                    AND p.name = '{st.session_state.current_user}'
+                    AND t.approved IS NULL;
+                ''', ttl="1m").iloc[0]['count'] > 0
 
-            # Show manage requests button if there are any requests
+                if already_requested:
+                    st.warning("Request pending")
+                else:
+                    if st.button("Join Team", key=f"join_team_{index}"):
+                        try:
+                            execute_query(f'''
+                                INSERT INTO team (idea_id, prt_id, approved)
+                                SELECT i.idea_id, p.prt_id, NULL
+                                FROM ideas i, participants p
+                                WHERE i.title = '{row['title']}'
+                                AND p.name = '{st.session_state.current_user}';
+                            ''')
+                            st.success(f"Sent join request for {row['title']}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error sending request: {str(e)}")
+
+            # Show pending requests count and manage button
+            pending_count = row['pending_requests']
             if pending_count > 0:
                 if st.button(f"Manage Requests ({pending_count})", key=f"manage_requests_{index}"):
-                    st.session_state.selected_project = project_title
+                    st.session_state.selected_project = row['title']
                     st.session_state.show_requests_modal = True
 
+# Requests Management Modal
+if st.session_state.show_requests_modal:
+    project = st.session_state.selected_project
+    st.subheader(f"Manage Requests - {project}")
 
-# Simplified Manage Requests Modal
-# if st.session_state.show_requests_modal:
-#     st.markdown("""
-#         <style>
-#         .request-list {
-#             margin: 10px 0;
-#         }
-#         </style>
-#     """, unsafe_allow_html=True)
+    # Get pending requests
+    pending_requests = conn.query(f'''
+        SELECT 
+            p.name,
+            p.skills,
+            t.team_id
+        FROM team t
+        JOIN ideas i ON t.idea_id = i.idea_id
+        JOIN participants p ON t.prt_id = p.prt_id
+        WHERE i.title = '{project}'
+        AND t.approved IS NULL;
+    ''', ttl="1m")
 
-#     project = st.session_state.selected_project
-#     st.subheader(f"Manage Requests - {project}")
+    if not pending_requests.empty:
+        for idx, request in pending_requests.iterrows():
+            cols = st.columns([3, 1, 1])
+            with cols[0]:
+                st.write(f"**{request['name']}**")
+                st.write(f"Skills: {request['skills']}")
+            with cols[1]:
+                if st.button("Accept", key=f"accept_{idx}"):
+                    try:
+                        execute_query(f"""
+                            UPDATE team 
+                            SET approved = true 
+                            WHERE team_id = {request['team_id']};
+                        """)
+                        st.success(f"Accepted {request['name']}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error accepting request: {str(e)}")
+            with cols[2]:
+                if st.button("Reject", key=f"reject_{idx}"):
+                    try:
+                        execute_query(f"""
+                            DELETE FROM team 
+                            WHERE team_id = {request['team_id']};
+                        """)
+                        st.error(f"Rejected {request['name']}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error rejecting request: {str(e)}")
+    else:
+        st.info("No pending requests")
 
-#     requests = st.session_state.join_requests[project]
-#     if requests:
-#         for idx, requester in enumerate(requests):
-#             cols = st.columns([3, 1, 1])
-#             with cols[0]:
-#                 st.write(f"**{requester}**")
-#             with cols[1]:
-#                 if st.button("Accept", key=f"accept_{requester}_{idx}"):
-#                     st.session_state.join_requests[project].remove(requester)
-#                     st.success(f"Accepted {requester}")
+    if st.button("Close", key="close_modal"):
+        st.session_state.show_requests_modal = False
+        st.rerun()
+
+# Add Project Form
+if st.button('Add Project'):
+    st.session_state.show_project_form = not st.session_state.show_project_form
+
+if st.session_state.show_project_form:
+    with st.form("project_form"):
+        project_title = st.text_input("Project Title")
+        project_idea = st.text_area("Project Idea")
+        project_skills = st.text_input("Required Skills (comma-separated)")
+        submitted = st.form_submit_button("Submit")
+        if submitted:
+            try:
+                execute_query(f"""
+                    INSERT INTO ideas (title, idea, skills_needed) 
+                    VALUES ('{project_title}', '{project_idea}', '{project_skills}');
+                """)
+                st.success("Project added successfully!")
+                st.session_state.show_project_form = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error adding project: {str(e)}")
+
+
+# project_df = conn.query(
+#     'SELECT title, idea,skills_needed FROM ideas;', ttl="1m")
+
+
+# project_df = project_df.rename(columns={
+#     'title': 'Title',
+#     'idea': 'Idea',
+#     'skills_needed': 'Required Skills'
+# })
+
+# for index, row in project_df.iterrows():
+#     with st.container():
+#         st.markdown("""
+#             <style>
+#             .project-card {
+#                 background-color: white;
+#                 padding: 1.5rem;
+#                 border-radius: 10px;
+#                 margin: 10px 0;
+#                 border: 1px solid #ddd;
+#                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+#             }
+#             .project-title {
+#                 color: #0569a0;
+#                 font-size: 1.5rem;
+#                 margin-bottom: 1rem;
+#             }
+#             .project-detail {
+#                 color: #333;
+#                 margin: 0.5rem 0;
+#             }
+#             .skills-tag {
+#                 background-color: #f0f2f6;
+#                 color: black;
+#                 padding: 0.2rem 0.5rem;
+#                 border-radius: 15px;
+#                 margin-right: 0.5rem;
+#                 display: inline-block;
+#                 margin-bottom: 0.3rem;
+#             }
+#             </style>
+#         """, unsafe_allow_html=True)
+
+#         # Project Card
+#         skills_list = row['Required Skills'].split(
+#             ',') if isinstance(row['Required Skills'], str) else []
+
+#         st.markdown(f"""
+#             <div class="project-card">
+#                 <div class="project-title">{row['Title']}</div>
+#                 <div class="project-detail"><strong>Idea:</strong> {row['Idea']}</div>
+#                 <div class="project-detail"><strong>Skills needed:</strong></div>
+#                 <div>
+#                     {''.join([f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
+#                 </div>
+#             </div>
+#         """, unsafe_allow_html=True)
+
+#         col1, col2 = st.columns([2, 1])
+
+#         # Initialize join requests for this project if not exists
+#         project_title = row['Title']
+#         if project_title not in st.session_state.join_requests:
+#             st.session_state.join_requests[project_title] = []
+
+#         pending_count = len(st.session_state.join_requests[project_title])
+
+#         # Action buttons
+#         with col2:
+#             # Show join button if not a member
+#             if st.session_state.current_user not in st.session_state.join_requests[project_title]:
+#                 if st.button("Join Team", key=f"join_team_{index}"):
+#                     st.session_state.join_requests[project_title].append(
+#                         st.session_state.current_user)
+#                     st.success(f"Sent join request for {project_title}")
 #                     st.rerun()
-#             with cols[2]:
-#                 if st.button("Reject", key=f"reject_{requester}_{idx}"):
-#                     st.session_state.join_requests[project].remove(requester)
-#                     st.error(f"Rejected {requester}")
-#                     st.rerun()
-#     else:
-#         st.info("No pending requests")
+#             else:
+#                 st.warning("Request pending")
 
-#     if st.button("Close", key="close_modal"):
-#         st.session_state.show_requests_modal = False
-#         st.rerun()
+#             # Show manage requests button if there are any requests
+#             if pending_count > 0:
+#                 if st.button(f"Manage Requests ({pending_count})", key=f"manage_requests_{index}"):
+#                     st.session_state.selected_project = project_title
+#                     st.session_state.show_requests_modal = True
+
 
 if st.button('Add Project'):
     st.session_state.show_project_form = not st.session_state.show_project_form
@@ -357,25 +460,3 @@ st.write(
 st.write(
     "Step 3: People can ask to participate in projects, and the project owner can choose who they want in their team based on their skills."
 )
-
-
-# experminenting with Gemini
-
-ggi.configure(api_key=st.secrets["GEMINI_KEY"])
-model = ggi.GenerativeModel("gemini-1.5-flash-8b")
-chat = model.start_chat()
-
-
-def LLM_Response(question):
-    response = chat.send_message(question, stream=True)
-    return response
-
-
-st.title("Chat Application using Gemini Pro")
-user_quest = st.text_input("Ask a question:")
-btn = st.button("Ask")
-if btn and user_quest:
-    result = LLM_Response(user_quest)
-    st.subheader("Response : ")
-    for word in result:
-        st.text(word.text)
