@@ -2,6 +2,12 @@ import pandas as pd
 import streamlit as st
 import google.generativeai as ggi
 
+conn = st.connection("neon", type="sql")
+df = conn.query('SELECT * FROM participants;', ttl="1m")
+for row in df.itertuples():
+    st.write(
+        f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
+
 
 st.image(
     "https://i.imgur.com/8Db5CpT.png",
@@ -63,17 +69,28 @@ if st.session_state.show_sponsor_form:
 
 
 # Participants Data
-db_participants = [
-    ['Participant Name', 'LinkedIn URL', 'Skills'],
-    ['Felipe Hoffa', 'https://linkedin.com/in/hoffa', ['Data', 'Python']],
-    ['Asako', 'https://www.linkedin.com/in/asako-hayase-924508ba/', ['Marketing', 'UX']],
-    ['Aninda', 'https://www.linkedin.com/in/aninda-sengupta/', ['Java', 'Python']],
-    ['Gulsher', 'https://www.linkedin.com/in/gulsher-kooner/', ['Data', 'Spark']],
-]
+# db_participants = [
+#     ['Participant Name', 'LinkedIn URL', 'Skills'],
+#     ['Felipe Hoffa', 'https://linkedin.com/in/hoffa', ['Data', 'Python']],
+#     ['Asako', 'https://www.linkedin.com/in/asako-hayase-924508ba/', ['Marketing', 'UX']],
+#     ['Aninda', 'https://www.linkedin.com/in/aninda-sengupta/', ['Java', 'Python']],
+#     ['Gulsher', 'https://www.linkedin.com/in/gulsher-kooner/', ['Data', 'Spark']],
+# ]
 
 st.header("Participants")
-project_df = pd.DataFrame(db_participants[1:], columns=db_participants[0])
-st.dataframe(project_df)
+# Get participants data from database
+participants_df = conn.query(
+    'SELECT name, url, interested_in, skills FROM participants;', ttl="1m")
+
+# Rename columns to match the expected format
+participants_df = participants_df.rename(columns={
+    'name': 'Name',
+    'url': 'LinkedIn URL',
+    'interested_in': 'Interests',
+    'skills': 'Skills'
+})
+
+st.dataframe(participants_df)
 
 if st.button('Add Participant'):
     st.session_state.show_participant_form = not st.session_state.show_participant_form
@@ -83,11 +100,34 @@ if st.session_state.show_participant_form:
         participant_name = st.text_input("Participant Name")
         linkedin_url = st.text_input("LinkedIn URL")
         skills = st.text_input("Skills (comma-separated)")
+        interested_in = st.text_area("Interested in")
         submitted = st.form_submit_button("Submit")
         if submitted:
-            # Add logic to save participant data
+            # Add to database
+            conn.execute(f"""
+                INSERT INTO participants (name, url, skills, interested_in) 
+                VALUES ('{participant_name}', '{linkedin_url}', '{skills}', '{interested_in}');
+            """)
             st.success("Participant added successfully!")
             st.session_state.show_participant_form = False
+            st.rerun()
+
+# project_df = pd.DataFrame(db_participants[1:], columns=db_participants[0])
+# st.dataframe(project_df)
+
+# if st.button('Add Participant'):
+#     st.session_state.show_participant_form = not st.session_state.show_participant_form
+
+# if st.session_state.show_participant_form:
+#     with st.form("participant_form"):
+#         participant_name = st.text_input("Participant Name")
+#         linkedin_url = st.text_input("LinkedIn URL")
+#         skills = st.text_input("Skills (comma-separated)")
+#         submitted = st.form_submit_button("Submit")
+#         if submitted:
+#             # Add logic to save participant data
+#             st.success("Participant added successfully!")
+#             st.session_state.show_participant_form = False
 
 
 # Projects Data
@@ -307,12 +347,3 @@ if btn and user_quest:
     st.subheader("Response : ")
     for word in result:
         st.text(word.text)
-
-
-# experimenting with postgres
-
-conn = st.connection("neon", type="sql")
-df = conn.query('SELECT * FROM participants;', ttl="1m")
-for row in df.itertuples():
-    st.write(
-        f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
