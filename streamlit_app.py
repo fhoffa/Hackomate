@@ -1,11 +1,6 @@
 import streamlit as st
 
 conn = st.connection("neon", type="sql")
-# df = conn.query('SELECT * FROM participants;', ttl="1m")
-# for row in df.itertuples():
-#     st.write(
-#         f"{row.name} skills are :{row.skills}:, and interested in {row.interested_in}. Find them on {row.url}")
-
 
 st.image(
     "https://i.imgur.com/8Db5CpT.png",
@@ -46,7 +41,7 @@ sponsors_df = sponsors_df.rename(columns={
 
 st.dataframe(sponsors_df)
 
-if st.button('Add Sponsor'):
+if st.button('Add Sponsor',  key="add_sponsors_button"):
     st.session_state.show_sponsor_form = not st.session_state.show_sponsor_form
 
 if st.session_state.show_sponsor_form:
@@ -80,7 +75,7 @@ participants_df = participants_df.rename(columns={
 
 st.dataframe(participants_df)
 
-if st.button('Add Participant'):
+if st.button('Add Participant', key="add_participant_button"):
     st.session_state.show_participant_form = not st.session_state.show_participant_form
 
 if st.session_state.show_participant_form:
@@ -143,7 +138,6 @@ db_projects = [
 
 st.header("Project Ideas")
 
-# Add CSS once at the top
 st.markdown("""
     <style>
     .project-card {
@@ -324,7 +318,7 @@ if st.session_state.show_requests_modal:
         st.rerun()
 
 # Add Project Form
-if st.button('Add Project'):
+if st.button('Add Project', key="add_project_button"):
     st.session_state.show_project_form = not st.session_state.show_project_form
 
 if st.session_state.show_project_form:
@@ -344,119 +338,3 @@ if st.session_state.show_project_form:
                 st.rerun()
             except Exception as e:
                 st.error(f"Error adding project: {str(e)}")
-
-
-# project_df = conn.query(
-#     'SELECT title, idea,skills_needed FROM ideas;', ttl="1m")
-
-
-# project_df = project_df.rename(columns={
-#     'title': 'Title',
-#     'idea': 'Idea',
-#     'skills_needed': 'Required Skills'
-# })
-
-# for index, row in project_df.iterrows():
-#     with st.container():
-#         st.markdown("""
-#             <style>
-#             .project-card {
-#                 background-color: white;
-#                 padding: 1.5rem;
-#                 border-radius: 10px;
-#                 margin: 10px 0;
-#                 border: 1px solid #ddd;
-#                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-#             }
-#             .project-title {
-#                 color: #0569a0;
-#                 font-size: 1.5rem;
-#                 margin-bottom: 1rem;
-#             }
-#             .project-detail {
-#                 color: #333;
-#                 margin: 0.5rem 0;
-#             }
-#             .skills-tag {
-#                 background-color: #f0f2f6;
-#                 color: black;
-#                 padding: 0.2rem 0.5rem;
-#                 border-radius: 15px;
-#                 margin-right: 0.5rem;
-#                 display: inline-block;
-#                 margin-bottom: 0.3rem;
-#             }
-#             </style>
-#         """, unsafe_allow_html=True)
-
-#         # Project Card
-#         skills_list = row['Required Skills'].split(
-#             ',') if isinstance(row['Required Skills'], str) else []
-
-#         st.markdown(f"""
-#             <div class="project-card">
-#                 <div class="project-title">{row['Title']}</div>
-#                 <div class="project-detail"><strong>Idea:</strong> {row['Idea']}</div>
-#                 <div class="project-detail"><strong>Skills needed:</strong></div>
-#                 <div>
-#                     {''.join([f'<span class="skills-tag">{skill.strip()}</span>' for skill in skills_list])}
-#                 </div>
-#             </div>
-#         """, unsafe_allow_html=True)
-
-#         col1, col2 = st.columns([2, 1])
-
-#         # Initialize join requests for this project if not exists
-#         project_title = row['Title']
-#         if project_title not in st.session_state.join_requests:
-#             st.session_state.join_requests[project_title] = []
-
-#         pending_count = len(st.session_state.join_requests[project_title])
-
-#         # Action buttons
-#         with col2:
-#             # Show join button if not a member
-#             if st.session_state.current_user not in st.session_state.join_requests[project_title]:
-#                 if st.button("Join Team", key=f"join_team_{index}"):
-#                     st.session_state.join_requests[project_title].append(
-#                         st.session_state.current_user)
-#                     st.success(f"Sent join request for {project_title}")
-#                     st.rerun()
-#             else:
-#                 st.warning("Request pending")
-
-#             # Show manage requests button if there are any requests
-#             if pending_count > 0:
-#                 if st.button(f"Manage Requests ({pending_count})", key=f"manage_requests_{index}"):
-#                     st.session_state.selected_project = project_title
-#                     st.session_state.show_requests_modal = True
-
-
-if st.button('Add Project'):
-    st.session_state.show_project_form = not st.session_state.show_project_form
-
-if st.session_state.show_project_form:
-    with st.form("project_form"):
-        project_title = st.text_input("Project Title")
-        project_idea = st.text_area("Project Idea")
-        team_members = st.text_input("Team Members (comma-separated)")
-        project_skills = st.text_input("Required Skills (comma-separated)")
-        submitted = st.form_submit_button("Submit")
-        if submitted:
-            # Add logic to save project data
-            st.success("Project added successfully!")
-            st.session_state.show_project_form = False
-
-
-st.write(
-    "Step 1 is collecting people and their LinkedIn resumes, also collecting hackathon sponsors and their description"
-)
-
-
-st.write(
-    "Step 2: Once a participan is logged in, they can suggest projects. The LLM will suggest other ideas, and suggest what tools from the sponsors can be used."
-)
-
-st.write(
-    "Step 3: People can ask to participate in projects, and the project owner can choose who they want in their team based on their skills."
-)
